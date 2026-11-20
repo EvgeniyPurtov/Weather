@@ -281,31 +281,32 @@
 
         let weatherData = null;
         let sunriseH = 8, sunsetH = 16; 
-        let cityLat = 57.134748;
-        let cityLon = 65.658854;
-        let cityName = "Тюмень";
+        
+        // Дефолтные координаты (Тюмень)
+        const DEFAULT_LAT = 57.134748;
+        const DEFAULT_LON = 65.658854;
+        const DEFAULT_CITY = "Тюмень";
 
-        // --- ОПРЕДЕЛЕНИЕ ГОРОДА (с очисткой от лишнего текста) ---
+        let cityLat = DEFAULT_LAT;
+        let cityLon = DEFAULT_LON;
+        let cityName = DEFAULT_CITY;
+
         async function reverseGeocode(lat, lon) {
             try {
                 const res = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=ru`);
                 const data = await res.json();
                 
                 let rawCity = data.city || data.principalSubdivision || data.countryName || "Неизвестно";
-                
-                // Очистка: разбиваем по запятой и берем первую часть, убираем "городской округ"
                 let cleanCity = rawCity.split(',')[0].trim();
                 cleanCity = cleanCity.replace(/городской округ/i, '').trim();
                 
-                // Делаем первую букву заглавной
                 if (cleanCity.length > 0) {
                     cleanCity = cleanCity.charAt(0).toUpperCase() + cleanCity.slice(1);
                 }
-                
                 return cleanCity;
             } catch (e) {
                 console.error("Ошибка геокодинга:", e);
-                return "Тюмень";
+                return DEFAULT_CITY;
             }
         }
 
@@ -444,27 +445,42 @@
             }
         }
 
-        // --- Инициализация с геолокацией ---
         async function initLocation() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     async (position) => {
-                        cityLat = position.coords.latitude;
-                        cityLon = position.coords.longitude;
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
                         
-                        document.getElementById('city').innerText = "..."; 
-                        cityName = await reverseGeocode(cityLat, cityLon);
+                        // ПРОВЕРКА: Если координаты сильно ушли (например, Варшава), используем Тюмень
+                        // Тюмень находится примерно на 57 широте и 65 долготе.
+                        // Если широта меньше 50 или больше 70, это скорее всего не наш регион.
+                        if (lat < 50 || lat > 70 || lon < 30 || lon > 100) {
+                            console.log("Определены неверные координаты (возможно VPN). Используем Тюмень.");
+                            cityLat = DEFAULT_LAT;
+                            cityLon = DEFAULT_LON;
+                            cityName = DEFAULT_CITY;
+                        } else {
+                            cityLat = lat;
+                            cityLon = lon;
+                            document.getElementById('city').innerText = "..."; 
+                            cityName = await reverseGeocode(cityLat, cityLon);
+                        }
                         
                         getWeather();
                     },
                     (error) => {
-                        console.log("Геолокация отклонена, используем Тюмень");
-                        cityName = "Тюмень";
+                        console.log("Геолокация отклонена или недоступна, используем Тюмень");
+                        cityLat = DEFAULT_LAT;
+                        cityLon = DEFAULT_LON;
+                        cityName = DEFAULT_CITY;
                         getWeather();
                     }
                 );
             } else {
-                cityName = "Тюмень";
+                cityLat = DEFAULT_LAT;
+                cityLon = DEFAULT_LON;
+                cityName = DEFAULT_CITY;
                 getWeather();
             }
         }
